@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react'
-import { supabase } from './lib/supabase'
-import Auth from './components/auth/Auth'
+import { useAuth } from "./context/AuthContext"
+import Auth from "./pages/Auth"
+import Home from "./pages/Home"
+import Loading from "./components/Loading"
+import { ThemeProvider } from "./context/ThemeContext"
 
-function App() {
-  console.log(Auth)
-  return (
-    <div className="App">
-      <Auth />
-    </div>
-  )
-  
+export default function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) return <ThemeProvider>  <Loading /></ThemeProvider>
+
+  return user ? <ThemeProvider><Home /></ThemeProvider> : <ThemeProvider><Auth /></ThemeProvider>
 }
-
-export default App

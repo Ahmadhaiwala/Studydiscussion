@@ -1,0 +1,5 @@
+SUPABASE_URL=https://jlznjylmntyzepvufkja.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=ssb_publishable_uIdLQY11_C-dSHBDQMx8NA_30_TLYGs
+SUPABASE_ANON_KEY=sb_publishable_uIdLQY11_C-dSHBDQMx8NA_30_TLYGs
+# Note: For production, you'll need the actual JWT secret from Supabase dashboard
+ SUPABASE_JWT_SECRET=ey0bc5b2c5-6333-432f-97f0-519c5d85b1a8

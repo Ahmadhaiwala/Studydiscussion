@@ -1,52 +1,119 @@
-import { useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { useState } from "react"
+import { supabase } from "../../lib/supabase"
+import { useTheme } from "../../context/ThemeContext"
 
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const submit=async (e) => {
-    e.preventDefault();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    
-  }
-  const googleSignup=async()=>{
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-    });
-  }
-  const githubSignup=async()=>{
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-    });
-  }
+    const { themeStyles } = useTheme()
 
+    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
+    const [confirmPassword, setConfirmPassword] = useState("")
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState("")
+    const [success, setSuccess] = useState("")
 
-  return (
+    const handleSignup = async (e) => {
+        e.preventDefault()
+        setError("")
+        setSuccess("")
 
-    <div>
-      <form onSubmit={submit}>
-        <label htmlFor="email">Email:</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <br />
+        if (password !== confirmPassword) {
+            setError("Passwords do not match")
+            return
+        }
 
-        <label htmlFor="password">Password:</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <br />
-        <input type="submit" value="Sign Up" />
-      </form>
-      <input type="button" value="Sign Up with Google" onClick={googleSignup} />
-      <input type="button" value="Sign Up with GitHub" onClick={githubSignup} />
-    </div>
-  );
+        if (password.length < 6) {
+            setError("Password must be at least 6 characters")
+            return
+        }
+
+        setLoading(true)
+
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+        })
+
+        setLoading(false)
+
+        if (error) {
+            setError(error.message)
+        } else {
+            setSuccess("Check your email to verify your account")
+        }
+    }
+
+    const signupWithProvider = async (provider) => {
+        await supabase.auth.signInWithOAuth({
+            provider,
+        })
+    }
+
+    return (
+        <div>
+            <h2 className="text-2xl font-bold mb-4">Sign Up</h2>
+
+            {error && (
+                <p className="text-red-500 text-sm mb-3">{error}</p>
+            )}
+
+            {success && (
+                <p className="text-green-500 text-sm mb-3">{success}</p>
+            )}
+
+            <form onSubmit={handleSignup} className="space-y-4">
+                <input
+                    type="email"
+                    placeholder="Email"
+                    className={`w-full px-3 py-2 rounded-md border ${themeStyles.input}`}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                />
+
+                <input
+                    type="password"
+                    placeholder="Password"
+                    className={`w-full px-3 py-2 rounded-md border ${themeStyles.input}`}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                />
+
+                <input
+                    type="password"
+                    placeholder="Confirm Password"
+                    className={`w-full px-3 py-2 rounded-md border ${themeStyles.input}`}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                />
+
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className={`w-full py-2 rounded-md transition ${themeStyles.button}`}
+                >
+                    {loading ? "Creating account..." : "Sign Up"}
+                </button>
+            </form>
+
+            {/* OAuth signup */}
+            <div className="mt-4 space-y-2">
+                <button
+                    onClick={() => signupWithProvider("google")}
+                    className={`w-full py-2 rounded-md border ${themeStyles.themeButton}`}
+                >
+                    Sign up with Google
+                </button>
+
+                <button
+                    onClick={() => signupWithProvider("github")}
+                    className={`w-full py-2 rounded-md border ${themeStyles.themeButton}`}
+                >
+                    Sign up with GitHub
+                </button>
+            </div>
+        </div>
+    )
 }

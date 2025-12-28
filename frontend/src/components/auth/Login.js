@@ -1,81 +1,90 @@
-import { useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { useState } from "react"
+import { supabase } from "../../lib/supabase"
+import { useTheme } from "../../context/ThemeContext"
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const loginWithGoogle = async () => {
-  await supabase.auth.signInWithOAuth({
-    provider: "google",
-  });
-};
-const loginWithGithub = async () => {
-  await supabase.auth.signInWithOAuth({
-    provider: "github",
-  });
-}
+    const { themeStyles } = useTheme()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
- 
+    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState("")
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const handleLogin = async (e) => {
+        e.preventDefault()
+        setError("")
+        setLoading(true)
 
-    setLoading(false);
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        })
 
-    if (error) {
-      setError(error.message);
-      return;
+        setLoading(false)
+
+        if (error) {
+            setError(error.message)
+        }
     }
 
-    console.log("Logged in user:", data.user);
-  };
+    const loginWithProvider = async (provider) => {
+        await supabase.auth.signInWithOAuth({
+            provider,
+        })
+    }
 
-  return (
-    <div>
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="email">Email:</label>
-        <input
-          type="email"
-          id="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <br />
+    return (
+        <div>
+            <h2 className="text-2xl font-bold mb-4">Login</h2>
 
-        <label htmlFor="password">Password:</label>
-        <input
-          type="password"
-          id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <br />
+            {error && (
+                <p className="text-red-500 text-sm mb-3">{error}</p>
+            )}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Logging in..." : "Login"}
-        </button>
+            <form onSubmit={handleLogin} className="space-y-4">
+                <input
+                    type="email"
+                    placeholder="Email"
+                    className={`w-full px-3 py-2 rounded-md border ${themeStyles.input}`}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                />
 
-        {error && <p style={{ color: "red" }}>{error}</p>}
-      </form>
+                <input
+                    type="password"
+                    placeholder="Password"
+                    className={`w-full px-3 py-2 rounded-md border ${themeStyles.input}`}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                />
 
-      <hr />
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className={`w-full py-2 rounded-md transition ${themeStyles.button}`}
+                >
+                    {loading ? "Logging in..." : "Login"}
+                </button>
+            </form>
 
-<button onClick={loginWithGoogle}>
-  Continue with Google
-</button>
+            {/* OAuth */}
+            <div className="mt-4 space-y-2">
+                <button
+                    onClick={() => loginWithProvider("google")}
+                    className={`w-full py-2 rounded-md border ${themeStyles.themeButton}`}
+                >
+                    Continue with Google
+                </button>
 
-<button onClick={loginWithGithub}>
-  Continue with GitHub
-</button>
-
-    </div>
-  );
+                <button
+                    onClick={() => loginWithProvider("github")}
+                    className={`w-full py-2 rounded-md border ${themeStyles.themeButton}`}
+                >
+                    Continue with GitHub
+                </button>
+            </div>
+        </div>
+    )
 }

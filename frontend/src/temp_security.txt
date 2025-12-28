@@ -1,0 +1,38 @@
+# backend/core/security.py
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from supabase import create_client
+import os
+
+security = HTTPBearer()
+
+# Initialize Supabase client for authentication verification
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://jlznjylmntyzepvufkja.supabase.co")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impsem5qeWxtbnR5emVwdnVma2phIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjIxNzUxMSwiZXhwIjoyMDgxNzkzNTExfQ.qRThwru7OHAvQCVJyCiRCgARviX1PyltpHKx2ueEny0", "ssb_publishable_uIdLQY11_C-dSHBDQMx8NA_30_TLYGs")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = credentials.credentials
+
+    try:
+        # Use Supabase client to verify the token
+        user_response = supabase.auth.get_user(token)
+        
+        if not user_response.user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+            )
+
+        # Return the user ID
+        return user_response.user.id
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Authentication failed: {str(e)}",
+        )
