@@ -1,6 +1,6 @@
 import { useAuth } from "./context/AuthContext"
 import Auth from "./pages/Auth"
-import Home from "./pages/Home"
+import Home from "./pages/home"
 import Loading from "./components/Loading"
 import { ThemeProvider } from "./context/ThemeContext"
 

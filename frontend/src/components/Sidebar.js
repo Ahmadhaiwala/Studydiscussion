@@ -2,14 +2,18 @@ import { useState } from "react"
 import { useTheme } from "../context/ThemeContext"
 import { useAuth } from "../context/AuthContext"
 import { useEffect } from "react"
-
-
+import { Link, useNavigate } from "react-router-dom"
 
 const menu = [
     {
         label: "Dashboard",
         icon: "🏠",
-        path: "/dashboard",
+        path: "/",
+    },
+    {
+        label: "Profile",
+        icon: "👤",
+        path: "/profile",
     },
     {
         label: "Users",
@@ -19,16 +23,16 @@ const menu = [
             { label: "Roles", path: "/roles" },
         ],
     },
-
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }) {
     const { themeStyles } = useTheme()
     const [open, setOpen] = useState(false)
     const [active, setActive] = useState(null)
     const { user } = useAuth()
     const [profile, setProfile] = useState(null)
     const [loadingProfile, setLoadingProfile] = useState(false)
+    const navigate = useNavigate()
 
     useEffect(() => {
         if (!user?.access_token) return
@@ -56,6 +60,14 @@ export default function Sidebar() {
 
         fetchProfile()
     }, [user])
+
+    const handleNavigation = (path) => {
+        navigate(path)
+        setOpen(false)
+        if (onNavigate) {
+            onNavigate(path)
+        }
+    }
 
     return (
         <>
@@ -94,35 +106,48 @@ export default function Sidebar() {
                 <nav className="p-2 space-y-1">
                     {menu.map((item, idx) => (
                         <div key={idx}>
-                            {/* Parent */}
-                            <button
-                                onClick={() =>
-                                    setActive(active === idx ? null : idx)
-                                }
-                                className="w-full flex items-center justify-between px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-neutral-700"
-                            >
-                                <span className="flex items-center gap-2">
+                            {/* Parent with children */}
+                            {item.children ? (
+                                <>
+                                    <button
+                                        onClick={() =>
+                                            setActive(active === idx ? null : idx)
+                                        }
+                                        className="w-full flex items-center justify-between px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-neutral-700"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <span>{item.icon}</span>
+                                            {item.label}
+                                        </span>
+                                        {item.children && (
+                                            <span>{active === idx ? "▲" : "▼"}</span>
+                                        )}
+                                    </button>
+
+                                    {/* Children */}
+                                    {item.children && active === idx && (
+                                        <div className="ml-6 mt-1 space-y-1 text-sm">
+                                            {item.children.map((child, cidx) => (
+                                                <button
+                                                    key={cidx}
+                                                    onClick={() => handleNavigation(child.path)}
+                                                    className="w-full text-left px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-neutral-800"
+                                                >
+                                                    {child.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                /* Parent without children */
+                                <button
+                                    onClick={() => handleNavigation(item.path)}
+                                    className="w-full text-left flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-neutral-700"
+                                >
                                     <span>{item.icon}</span>
                                     {item.label}
-                                </span>
-                                {item.children && (
-                                    <span>{active === idx ? "▲" : "▼"}</span>
-                                )}
-                            </button>
-
-                            {/* Children */}
-                            {item.children && active === idx && (
-                                <div className="ml-6 mt-1 space-y-1 text-sm">
-                                    {item.children.map((child, cidx) => (
-                                        <a
-                                            key={cidx}
-                                            href={child.path}
-                                            className="block px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-neutral-800"
-                                        >
-                                            {child.label}
-                                        </a>
-                                    ))}
-                                </div>
+                                </button>
                             )}
                         </div>
                     ))}
@@ -130,7 +155,10 @@ export default function Sidebar() {
 
                 {/* Footer */}
                 <div className="absolute bottom-0 w-full p-4 border-t text-sm">
-                    <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => handleNavigation("/profile")}
+                        className="w-full text-left flex items-center gap-2 hover:opacity-80 transition-opacity"
+                    >
                         <img
                             className="w-8 h-8 rounded-full"
                             src={profile?.avatar || "https://i.pravatar.cc/100"}
@@ -140,11 +168,9 @@ export default function Sidebar() {
                             <div className="font-medium">
                                 {loadingProfile ? "Loading..." : profile?.username || "Anonymous"}
                             </div>
-                            <button className="text-xs opacity-70 hover:opacity-100">
-                                Sign out
-                            </button>
+                            <div className="text-xs opacity-70">View Profile</div>
                         </div>
-                    </div>
+                    </button>
                 </div>
             </aside>
         </>
