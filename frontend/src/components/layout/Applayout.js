@@ -28,16 +28,11 @@ export default function AppLayout() {
                     </button>
                 ))}
             </div>
-            <button
-                onClick={logout}
-                className="text-sm opacity-70 hover:opacity-100 "
-            >
-                Logout
-            </button>
+            
 
             <main className="flex-1 p-4">
                 <Outlet />
-            </main>
+            </main> 
         </div>
     )
 }

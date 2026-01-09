@@ -1,12 +1,13 @@
-import { useAuth } from "../../context/AuthContext"
+import React from "react"
 import ChatSidebar from "../chat/chatsidebar"
-import { Outlet } from "react-router-dom"
+import { useTheme } from "../../context/ThemeContext"
 export default function ChatLayout() {
+    const { themeStyles } = useTheme()
     return (
-        <div className="flex left-5">
+        <div className="flex h-screen abc">
             <ChatSidebar />
-            <main>
-                <Outlet />
+            <main className={`flex-1 p-4 overflow-y-auto ${themeStyles.bg} ${themeStyles.text}`}>
+                {/* Chat content goes here */}
             </main>
         </div>
     )

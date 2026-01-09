@@ -31,6 +31,7 @@ const menu = [
 ]
 
 export default function Sidebar({ onNavigate }) {
+    const {logout} = useAuth()
     const { themeStyles } = useTheme()
     const [open, setOpen] = useState(false)
     const [active, setActive] = useState(null)
@@ -76,7 +77,7 @@ export default function Sidebar({ onNavigate }) {
 
     return (
         <>
-            {/* Mobile toggle */}
+         
             <button
                 onClick={() => setOpen(true)}
                 className="lg:hidden fixed top-4 left-4 z-50 px-3 py-2 bg-black text-white rounded"
@@ -84,7 +85,7 @@ export default function Sidebar({ onNavigate }) {
                 ☰
             </button>
 
-            {/* Overlay */}
+           
             {open && (
                 <div
                     onClick={() => setOpen(false)}
@@ -92,7 +93,7 @@ export default function Sidebar({ onNavigate }) {
                 />
             )}
 
-            {/* Sidebar */}
+            
             <aside
                 className={`
           fixed top-0 left-0 h-full w-64 z-50
@@ -102,12 +103,12 @@ export default function Sidebar({ onNavigate }) {
           ${themeStyles.cardBg} ${themeStyles.text} ${themeStyles.border}
         `}
             >
-                {/* Header */}
+              
                 <div className="p-4 text-xl font-bold border-b">
                     Unified hub
                 </div>
 
-                {/* Nav */}
+                
                 <nav className="p-2 space-y-1">
                     {menu.map((item, idx) => (
                         <div key={idx}>
@@ -158,7 +159,12 @@ export default function Sidebar({ onNavigate }) {
                     ))}
                 </nav>
 
-                {/* Footer */}
+                <button
+                onClick={logout}
+                className="text-sm opacity-70 hover:opacity-100 "
+            >
+                Logout
+            </button>
                 <div className="absolute bottom-0 w-full p-4 border-t text-sm">
                     <button
                         onClick={() => handleNavigation("/profile")}
