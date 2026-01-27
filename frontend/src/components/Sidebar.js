@@ -11,9 +11,9 @@ const menu = [
         path: "/dashboard",
     },
     {
-        label: "Profile",
+        label: "Friends",
         icon: "👤",
-        path: "/profile",
+        path: "/friends",
     },
     {
         label: "Chat",
@@ -112,7 +112,7 @@ export default function Sidebar({ onNavigate }) {
                 <nav className="p-2 space-y-1">
                     {menu.map((item, idx) => (
                         <div key={idx}>
-                            {/* Parent with children */}
+                           
                             {item.children ? (
                                 <>
                                     <button
@@ -130,7 +130,7 @@ export default function Sidebar({ onNavigate }) {
                                         )}
                                     </button>
 
-                                    {/* Children */}
+                                   
                                     {item.children && active === idx && (
                                         <div className="ml-6 mt-1 space-y-1 text-sm">
                                             {item.children.map((child, cidx) => (
