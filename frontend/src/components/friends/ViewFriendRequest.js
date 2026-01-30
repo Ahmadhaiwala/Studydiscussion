@@ -18,7 +18,7 @@ export default function FriendRequest() {
 
     const data = await response.json()
     if (response.ok) setRequests(data.requests ?? data ?? [])
-    
+
   }
 
   async function acceptRequest(id) {
@@ -45,19 +45,19 @@ export default function FriendRequest() {
         <p>No pending requests</p>
       ) : (
         requests.map((req) => (
-          <div key={req.id} className="border rounded mb-2">
-            
-            
+          <div key={req.user_id} className="border rounded mb-2">
+
+
             <div
               className="flex justify-between p-3 cursor-pointer bg-gray-100"
-              onClick={() => setOpenId(openId === req.id ? null : req.id)}
+              onClick={() => setOpenId(openId === req.user_id ? null : req.user_id)}
             >
               <span className="font-semibold">{req.name}</span>
-              <span>{openId === req.id ? "▲" : "▼"}</span>
+              <span>{openId === req.user_id ? "▲" : "▼"}</span>
             </div>
 
             {/* BODY */}
-            {openId === req.id && (
+            {openId === req.user_id && (
               <div className="p-3 bg-white">
                 <p className="text-sm text-gray-500 mb-2">
                   Request sent on {new Date(req.created_at).toLocaleDateString()}
@@ -65,14 +65,14 @@ export default function FriendRequest() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => acceptRequest(req.id)}
+                    onClick={() => acceptRequest(req.user_id)}
                     className="bg-green-500 text-white px-3 py-1 rounded"
                   >
                     Accept
                   </button>
 
                   <button
-                    onClick={() => rejectRequest(req.id)}
+                    onClick={() => rejectRequest(req.user_id)}
                     className="bg-red-500 text-white px-3 py-1 rounded"
                   >
                     Reject

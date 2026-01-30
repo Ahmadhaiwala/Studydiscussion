@@ -4,6 +4,48 @@ from app.schemas.friends import Friend
 
 class Friendservices:
     @staticmethod
+    async def acceptfriendreq(user_id: str, request_id: str):
+        try:
+           
+            request = (
+                supabase.table("friend_request")
+                .select("*")
+                .eq("id", request_id)
+                .eq("receiver_id", user_id)
+                .eq("status", "pending")
+                .execute()
+            ).data
+
+            if not request:
+                raise HTTPException(404, "Friend request not found")
+
+        
+            supabase.table("friend_request")\
+                .update({"status": "accepted"})\
+                .eq("id", request[0]["id"])\
+                .execute()
+
+        
+            supabase.table("friends").insert({
+                "user_id": user_id,
+                "friend_id": request[0]["sender_id"]
+            }).execute()
+
+        
+            supabase.table("friend_request")\
+                .delete()\
+                .eq("id", request[0]["id"])\
+                .execute()
+
+            return True
+
+        except Exception as e:
+            print("ERROR:", e)
+            raise HTTPException(500, "Failed to accept friend request")
+
+
+            
+    @staticmethod
     async def addfriend(user_id: str, friend_id: str):
         try:
             existing = (
@@ -136,4 +178,75 @@ class Friendservices:
             print("ERROR:", e)
             raise HTTPException(500, "Failed to search friends")
     
+    @staticmethod
+    async def get_friend_requests(user_id: str):
+        """Get all pending friend requests for the current user"""
+        try:
+            rows = (
+                supabase
+                .table("friend_request")
+                .select("id, sender_id, receiver_id, status, created_at")
+                .eq("receiver_id", user_id)
+                .eq("status", "pending")
+                .execute()
+            ).data
+
+            if not rows:
+                return []
+
+            # Get sender profiles
+            sender_ids = [r["sender_id"] for r in rows]
+            profiles = (
+                supabase
+                .table("profiles")
+                .select("id, username")
+                .in_("id", sender_ids)
+                .execute()
+            ).data
+
+            profile_map = {p["id"]: p["username"] for p in profiles}
+
+            return [
+                Friend(
+                    user_id=r["id"],
+                    friend_id=r["sender_id"],
+                    name=profile_map.get(r["sender_id"], "Unknown"),
+                    status=r["status"],
+                    created_at=r["created_at"]
+                )
+                for r in rows
+            ]
+
+        except Exception as e:
+            print("ERROR:", e)
+            raise HTTPException(500, "Failed to fetch friend requests")
+
+    @staticmethod
+    async def reject_friend_request(user_id: str, request_id: str):
+        """Reject a friend request"""
+        try:
+            # Find the pending request
+            request = (
+                supabase.table("friend_request")
+                .select("*")
+                .eq("id", request_id)
+                .eq("receiver_id", user_id)
+                .eq("status", "pending")
+                .execute()
+            ).data
+
+            if not request:
+                raise HTTPException(404, "Friend request not found")
+
+            # Delete the request
+            supabase.table("friend_request")\
+                .delete()\
+                .eq("id", request[0]["id"])\
+                .execute()
+
+            return True
+
+        except Exception as e:
+            print("ERROR:", e)
+            raise HTTPException(500, "Failed to reject friend request")
 

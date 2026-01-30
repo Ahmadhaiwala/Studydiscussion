@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react"
 import { useAuth } from "../../context/AuthContext"
-
+import { useNavigate } from "react-router-dom"
 import Swal from "sweetalert2"
 import FriendRequest from "./ViewFriendRequest"
 
 export default function ViewFriend() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const [friends, setFriends] = useState([])
-  const [allFriends, setAllFriends] = useState([]) 
+  const [allFriends, setAllFriends] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [removingId, setRemovingId] = useState(null)
@@ -32,7 +33,7 @@ export default function ViewFriend() {
 
       const list = data.friends ?? data
       setFriends(list)
-      setAllFriends(list) 
+      setAllFriends(list)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -40,7 +41,7 @@ export default function ViewFriend() {
     }
   }
 
-  
+
   function handleSearch(value) {
     const filtered = allFriends.filter((friend) =>
       friend.name.toLowerCase().includes(value.toLowerCase())
@@ -48,7 +49,7 @@ export default function ViewFriend() {
     setFriends(filtered)
   }
 
-  
+
   async function handleUnfriend(friendId) {
     const result = await Swal.fire({
       title: "Unfriend?",
@@ -82,6 +83,29 @@ export default function ViewFriend() {
       Swal.fire("Error", "Something went wrong", "error")
     } finally {
       setRemovingId(null)
+    }
+  }
+
+  async function handleMessage(friendId) {
+    try {
+      // Create or get conversation with this friend
+      const response = await fetch(
+        `http://localhost:8000/api/chat/conversations/${friendId}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${user.access_token}` },
+        }
+      )
+
+      if (response.ok) {
+        // Navigate to chat page
+        navigate("/chat")
+      } else {
+        Swal.fire("Error", "Failed to start conversation", "error")
+      }
+    } catch (error) {
+      console.error("Failed to start conversation:", error)
+      Swal.fire("Error", "Something went wrong", "error")
     }
   }
 
@@ -121,13 +145,19 @@ export default function ViewFriend() {
               </span>
 
               <button
+                onClick={() => handleMessage(friend.friend_id)}
+                className="px-3 py-1 text-sm rounded text-white bg-blue-500 hover:bg-blue-600"
+              >
+                Message
+              </button>
+
+              <button
                 disabled={removingId === friend.friend_id}
                 onClick={() => handleUnfriend(friend.friend_id)}
-                className={`px-3 py-1 text-sm rounded text-white ${
-                  removingId === friend.friend_id
+                className={`px-3 py-1 text-sm rounded text-white ${removingId === friend.friend_id
                     ? "bg-gray-400"
                     : "bg-red-500 hover:bg-red-600"
-                }`}
+                  }`}
               >
                 {removingId === friend.friend_id ? "Removing..." : "Unfriend"}
               </button>
