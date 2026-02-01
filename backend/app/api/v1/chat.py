@@ -153,23 +153,32 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
                 group_id = data.get("group_id")
                 content = data.get("content")
                 
-                # Save message to database
-                message = await ChatGroupService.send_group_message(group_id, user_id, content)
-                
-                # Broadcast to all group members
-                message_data = {
-                    "type": "new_group_message",
-                    "message": {
-                        "id": str(message.id),
-                        "group_id": str(message.group_id),
-                        "sender_id": str(message.sender_id),
-                        "content": message.content,
-                        "created_at": message.created_at.isoformat()
+                try:
+                    # Save message to database
+                    message = await ChatGroupService.send_group_message(group_id, user_id, content)
+                    
+                    # Broadcast to all group members
+                    message_data = {
+                        "type": "new_group_message",
+                        "message": {
+                            "id": str(message["id"]),  # Access as dictionary
+                            "group_id": str(message["group_id"]),
+                            "sender_id": str(message["sender_id"]),
+                            "content": message["content"],
+                            "created_at": message["created_at"]
+                        }
                     }
-                }
-                
-                # Send to all subscribed members
-                await manager.send_group_message(message_data, group_id)
+                    
+                    # Send to all subscribed members
+                    await manager.send_group_message(message_data, group_id)
+                except Exception as e:
+                    print(f"Error sending group message: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    await manager.send_personal_message({
+                        "type": "error",
+                        "message": f"Failed to send message: {str(e)}"
+                    }, user_id)
             
             elif action == "typing_in_group":
                 # Broadcast typing indicator to group

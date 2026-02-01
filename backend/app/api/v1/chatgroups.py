@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+﻿from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from app.core.security import get_current_user
 from app.schemas.chatgroups import (
     ChatGroupCreate, ChatGroupOut, ChatGroupListOut,
     ChatGroupUpdate, GroupMessegeCreate, GroupMessegeOut,
-    GroupMesegeListOut, GroupMemberAdd
+    GroupMesegeListOut, GroupMemberAdd, MemberListOut,
+    GroupAttachmentOut, GroupAttachmentListOut, AvailableUsersListOut
 )
 from app.services.chatgroupservices import ChatGroupService
 from typing import List
@@ -71,15 +72,25 @@ async def delete_group(
 
 # ===== MEMBER MANAGEMENT =====
 
-@router.get("/chatgroups/{group_id}/members")
+@router.get("/chatgroups/{group_id}/members", response_model=MemberListOut)
 async def get_group_members(
     group_id: str,
     current_user=Depends(get_current_user)
 ):
     """
-    Get all members of a chat group
+    Get all members of a chat group with user details
     """
     return await ChatGroupService.get_group_members(group_id, current_user.id)
+
+@router.get("/chatgroups/{group_id}/available-users", response_model=AvailableUsersListOut)
+async def get_available_users(
+    group_id: str,
+    current_user=Depends(get_current_user)
+):
+    """
+    Get users that can be added to the group
+    """
+    return await ChatGroupService.get_available_users(group_id, current_user.id)
 
 @router.post("/chatgroups/{group_id}/members")
 async def add_members(
@@ -168,3 +179,56 @@ async def delete_message(
         current_user.id
     )
     return {"message": "Message deleted successfully"}
+
+# ===== DOCUMENT/ATTACHMENT MANAGEMENT =====
+
+@router.post("/chatgroups/{group_id}/attachments", response_model=GroupAttachmentOut)
+async def upload_attachment(
+    group_id: str,
+    file: UploadFile = File(...),
+    message_id: str = None,
+    current_user=Depends(get_current_user)
+):
+    """
+    Upload a file/document to a group chat
+    """
+    return await ChatGroupService.upload_document(
+        group_id,
+        current_user.id,
+        file,
+        message_id
+    )
+
+@router.get("/chatgroups/{group_id}/attachments", response_model=GroupAttachmentListOut)
+async def get_group_attachments(
+    group_id: str,
+    current_user=Depends(get_current_user)
+):
+    """
+    Get all attachments in a group
+    """
+    return await ChatGroupService.get_group_attachments(group_id, current_user.id)
+
+@router.get("/chatgroups/{group_id}/attachments/{attachment_id}")
+async def get_attachment_download_url(
+    group_id: str,
+    attachment_id: str,
+    current_user=Depends(get_current_user)
+):
+    """
+    Get a signed URL to download an attachment
+    """
+    return await ChatGroupService.get_attachment_download_url(attachment_id, current_user.id)
+
+@router.delete("/chatgroups/{group_id}/attachments/{attachment_id}")
+async def delete_attachment(
+    group_id: str,
+    attachment_id: str,
+    current_user=Depends(get_current_user)
+):
+    """
+    Delete an attachment (uploader or admin only)
+    """
+    await ChatGroupService.delete_attachment(attachment_id, current_user.id)
+    return {"message": "Attachment deleted successfully"}
+

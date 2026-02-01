@@ -196,24 +196,56 @@ class ChatGroupService:
             raise HTTPException(status_code=500, detail=str(e))
     
     @staticmethod
-    async def add_member(group_id,user_id):
+    async def add_members(group_id, current_user_id, user_ids):
+        """Add multiple members to a group (admin only)"""
         try:
+            # Check if current user is admin
+            admin_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("role")
+                    .eq("group_id", group_id)
+                    .eq("user_id", current_user_id)
+                    .execute()
+            )
+            
+            if not admin_check.data or admin_check.data[0].get("role") != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only admins can add members"
+                )
+            
+            # Add each user as a member
+            members_to_add = []
+            for user_id in user_ids:
+                member_id = str(uuid.uuid4())
+                members_to_add.append({
+                    "id": member_id,
+                    "group_id": group_id,
+                    "user_id": str(user_id),
+                    "role": "member"
+                })
+            
+            # Bulk insert
             response = await run_in_threadpool(
                 lambda: supabase
                     .table("group_members")
-                    .insert({
-                        "group_id": group_id,
-                        "user_id": user_id
-                    })
+                    .insert(members_to_add)
                     .execute()
             )
 
-            print("Database response:", response)
+            print("Add members response:", response)
 
-            group = response.data[0]
-
+            if not response.data:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to add members"
+                )
+            
+            # Return added members with user info
             return {
-                "group": group
+                "message": f"Successfully added {len(user_ids)} member(s)",
+                "added_count": len(response.data)
             }
 
         except Exception as e:
@@ -221,23 +253,66 @@ class ChatGroupService:
             raise HTTPException(status_code=500, detail=str(e))
     
     @staticmethod
-    async def remove_member(group_id,user_id):
+    async def remove_member(group_id, current_user_id, user_id_to_remove):
+        """Remove a member from the group (admin only, cannot remove last admin)"""
         try:
+            # Check if current user is admin
+            admin_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("role")
+                    .eq("group_id", group_id)
+                    .eq("user_id", current_user_id)
+                    .execute()
+            )
+            
+            if not admin_check.data or admin_check.data[0].get("role") != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only admins can remove members"
+                )
+            
+            # Check if user to remove is an admin
+            target_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("role")
+                    .eq("group_id", group_id)
+                    .eq("user_id", user_id_to_remove)
+                    .execute()
+            )
+            
+            if target_check.data and target_check.data[0].get("role") == "admin":
+                # Count total admins
+                admin_count = await run_in_threadpool(
+                    lambda: supabase
+                        .table("group_members")
+                        .select("id")
+                        .eq("group_id", group_id)
+                        .eq("role", "admin")
+                        .execute()
+                )
+                
+                if len(admin_count.data) <= 1:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Cannot remove the last admin"
+                    )
+            
+            # Remove the member
             response = await run_in_threadpool(
                 lambda: supabase
                     .table("group_members")
                     .delete()
                     .eq("group_id", group_id)
-                    .eq("user_id", user_id)
+                    .eq("user_id", user_id_to_remove)
                     .execute()
             )
 
-            print("Database response:", response)
-
-            group = response.data[0]
+            print("Remove member response:", response)
 
             return {
-                "group": group
+                "message": "Member removed successfully"
             }
 
         except Exception as e:
@@ -245,24 +320,41 @@ class ChatGroupService:
             raise HTTPException(status_code=500, detail=str(e))
     
     @staticmethod
-    async def get_group_members(group_id):
+    async def get_group_members(group_id, current_user_id):
+        """Get all members of a group with user details"""
         try:
-            response = await run_in_threadpool(
+            # Verify user is a member
+            member_check = await run_in_threadpool(
                 lambda: supabase
                     .table("group_members")
-                    .select(
-                        "user_id"
-                    )
+                    .select("id")
+                    .eq("group_id", group_id)
+                    .eq("user_id", current_user_id)
+                    .execute()
+            )
+            
+            if not member_check.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not a member of this group"
+                )
+            
+            # Get members with user details using the view
+            response = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members_with_details")
+                    .select("*")
                     .eq("group_id", group_id)
                     .execute()
             )
 
-            print("Database response:", response)
+            print("Get group members response:", response)
 
-            group = response.data[0]
+            members = response.data or []
 
             return {
-                "group": group
+                "count": len(members),
+                "members": members
             }
 
         except Exception as e:
@@ -295,10 +387,14 @@ class ChatGroupService:
     @staticmethod
     async def send_group_message(group_id, user_id, message):
         try:
+            # Generate UUID for the message
+            message_id = str(uuid.uuid4())
+            
             response = await run_in_threadpool(
                 lambda: supabase
-                    .table("group_messages")
+                    .table("group_messseges")  # Fixed: table name has 3 s's
                     .insert({
+                        "id": message_id,  # Add the UUID
                         "group_id": group_id,
                         "sender_id": user_id,
                         "content": message
@@ -319,7 +415,7 @@ class ChatGroupService:
             if message_id:
                 fetch_response = await run_in_threadpool(
                     lambda: supabase
-                        .table("group_messages")
+                        .table("group_messseges")  # Fixed: table name has 3 s's
                         .select("id, group_id, sender_id, content, created_at, updated_at")
                         .eq("id", message_id)
                         .execute()
@@ -335,9 +431,25 @@ class ChatGroupService:
     @staticmethod
     async def get_group_messages(group_id, user_id, limit=50, offset=0):
         try:
+            # Verify user is a member of the group
+            member_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("id")
+                    .eq("group_id", group_id)
+                    .eq("user_id", user_id)
+                    .execute()
+            )
+            
+            if not member_check.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not a member of this group"
+                )
+            
             response = await run_in_threadpool(
                 lambda: supabase
-                    .table("group_messages")
+                    .table("group_messseges")  # Fixed: actual table name has 3 s's
                     .select(
                         "id, group_id, sender_id, content, created_at, updated_at"
                     )
@@ -357,15 +469,19 @@ class ChatGroupService:
                 "messages": messages
             }
 
+        except HTTPException:
+            raise
         except Exception as e:
-            print("ERROR:", str(e))
+            print("ERROR in get_group_messages:", str(e))
+            import traceback
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail=str(e))
     @staticmethod
     async def delete_message(message_id, user_id):
         try:
             response = await run_in_threadpool(
                 lambda: supabase
-                .table("group_messages")
+                .table("group_messseges")  # Fixed: table name has 3 s's
                 .delete()
                 .eq("id", message_id)
                 .eq("sender_id", user_id)
@@ -426,5 +542,310 @@ class ChatGroupService:
             print(f"ERROR in get_user_conversations: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
+    # ===== DOCUMENT/ATTACHMENT MANAGEMENT =====
+    
+    @staticmethod
+    async def upload_document(group_id, current_user_id, file, message_id=None):
+        """Upload a document/file to a group"""
+        try:
+            # Verify user is a member
+            member_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("id")
+                    .eq("group_id", group_id)
+                    .eq("user_id", current_user_id)
+                    .execute()
+            )
+            
+            if not member_check.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You must be a member to upload files"
+                )
+            
+            # Read file content
+            file_content = await file.read()
+            file_size = len(file_content)
+            
+            # Validate file size (10MB limit)
+            max_size = 10 * 1024 * 1024  # 10MB
+            if file_size > max_size:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File size exceeds maximum of {max_size / (1024*1024)}MB"
+                )
+            
+            # Generate file path: {group_id}/{uploader_id}/{filename}
+            file_path = f"{group_id}/{current_user_id}/{file.filename}"
+            
+            # Upload to Supabase Storage
+            upload_response = await run_in_threadpool(
+                lambda: supabase.storage
+                    .from_("group-documents")
+                    .upload(file_path, file_content, {
+                        "content-type": file.content_type
+                    })
+            )
+            
+            if upload_response.error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload file: {upload_response.error}"
+                )
+            
+            # Save attachment metadata to database
+            attachment_id = str(uuid.uuid4())
+            attachment_data = {
+                "id": attachment_id,
+                "group_id": group_id,
+                "message_id": message_id,
+                "uploader_id": current_user_id,
+                "file_name": file.filename,
+                "file_path": file_path,
+                "file_type": file.content_type,
+                "file_size": file_size
+            }
+            
+            db_response = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_attachments")
+                    .insert(attachment_data)
+                    .execute()
+            )
+            
+            if not db_response.data:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to save attachment metadata"
+                )
+            
+            return db_response.data[0]
 
+        except Exception as e:
+            print(f"Upload error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @staticmethod
+    async def get_group_attachments(group_id, current_user_id):
+        """Get all attachments in a group"""
+        try:
+            # Verify user is a member
+            member_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("id")
+                    .eq("group_id", group_id)
+                    .eq("user_id", current_user_id)
+                    .execute()
+            )
+            
+            if not member_check.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You must be a member to view attachments"
+                )
+            
+            # Get attachments with user info
+            response = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_attachments_with_user")
+                    .select("*")
+                    .eq("group_id", group_id)
+                    .order("created_at", desc=True)
+                    .execute()
+            )
+            
+            attachments = response.data or []
+            
+            return {
+                "count": len(attachments),
+                "attachments": attachments
+            }
 
+        except Exception as e:
+            print(f"Get attachments error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @staticmethod
+    async def get_attachment_download_url(attachment_id, current_user_id):
+        """Get a signed URL to download an attachment"""
+        try:
+            # Get attachment details
+            attachment_response = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_attachments")
+                    .select("*")
+                    .eq("id", attachment_id)
+                    .execute()
+            )
+            
+            if not attachment_response.data:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Attachment not found"
+                )
+            
+            attachment = attachment_response.data[0]
+            
+            # Verify user is a member of the group
+            member_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("id")
+                    .eq("group_id", attachment["group_id"])
+                    .eq("user_id", current_user_id)
+                    .execute()
+            )
+            
+            if not member_check.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You must be a member to download this file"
+                )
+            
+            # Generate signed URL (expires in 1 hour)
+            signed_url = await run_in_threadpool(
+                lambda: supabase.storage
+                    .from_("group-documents")
+                    .create_signed_url(attachment["file_path"], 3600)
+            )
+            
+            if signed_url.get("error"):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to generate download URL"
+                )
+            
+            return {
+                "file_name": attachment["file_name"],
+                "download_url": signed_url["signedURL"],
+                "expires_in": 3600
+            }
+
+        except Exception as e:
+            print(f"Download URL error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @staticmethod
+    async def delete_attachment(attachment_id, current_user_id):
+        """Delete an attachment (uploader or admin only)"""
+        try:
+            # Get attachment details
+            attachment_response = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_attachments")
+                    .select("*")
+                    .eq("id", attachment_id)
+                    .execute()
+            )
+            
+            if not attachment_response.data:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Attachment not found"
+                )
+            
+            attachment = attachment_response.data[0]
+            
+            # Check if user is uploader or admin
+            is_uploader = attachment["uploader_id"] == current_user_id
+            
+            if not is_uploader:
+                # Check if user is admin
+                admin_check = await run_in_threadpool(
+                    lambda: supabase
+                        .table("group_members")
+                        .select("role")
+                        .eq("group_id", attachment["group_id"])
+                        .eq("user_id", current_user_id)
+                        .execute()
+                )
+                
+                if not admin_check.data or admin_check.data[0].get("role") != "admin":
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Only the uploader or group admin can delete this file"
+                    )
+            
+            # Delete from storage
+            storage_response = await run_in_threadpool(
+                lambda: supabase.storage
+                    .from_("group-documents")
+                    .remove([attachment["file_path"]])
+            )
+            
+            # Delete from database
+            db_response = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_attachments")
+                    .delete()
+                    .eq("id", attachment_id)
+                    .execute()
+            )
+            
+            return {"message": "Attachment deleted successfully"}
+
+        except Exception as e:
+            print(f"Delete attachment error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @staticmethod
+    async def get_available_users(group_id, current_user_id):
+        """Get users that can be added to the group (not already members)"""
+        try:
+            # Verify current user is a member (and preferably admin)
+            member_check = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("role")
+                    .eq("group_id", group_id)
+                    .eq("user_id", current_user_id)
+                    .execute()
+            )
+            
+            if not member_check.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You must be a member to view available users"
+                )
+            
+            # Get existing member user IDs
+            existing_members = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_members")
+                    .select("user_id")
+                    .eq("group_id", group_id)
+                    .execute()
+            )
+            
+            existing_user_ids = [m["user_id"] for m in existing_members.data]
+            
+            # Get all users
+            all_users = await run_in_threadpool(
+                lambda: supabase
+                    .table("profiles")  # Fixed: table name is profiles, not user_profiles
+                    .select("id, username, full_name, avatar_url")  # Fixed: column is id, not user_id
+                    .execute()
+            )
+            
+            # Filter out existing members
+            available_users = [
+                {
+                    "user_id": user["id"],  # Map id to user_id for consistency
+                    "username": user.get("username"),
+                    "full_name": user.get("full_name"),
+                    "avatar_url": user.get("avatar_url")
+                }
+                for user in all_users.data
+                if user["id"] not in existing_user_ids  # Compare with id field
+            ]
+            
+            return {
+                "count": len(available_users),
+                "users": available_users
+            }
+
+        except Exception as e:
+            print(f"Get available users error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
