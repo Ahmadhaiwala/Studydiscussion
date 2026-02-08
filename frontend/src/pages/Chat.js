@@ -6,10 +6,11 @@ import FriendListForChat from "../components/chat/FriendListForChat"
 import GroupChatList from "../components/chat/GroupChatList"
 import GroupChatWindow from "../components/chat/GroupChatWindow"
 import CreateGroupModal from "../components/chat/CreateGroupModal"
+import AIChatWindow from "../components/chat/AIChatWindow"
 
 export default function Chat() {
     const { themeStyles } = useTheme()
-    const [activeTab, setActiveTab] = useState("direct") // "direct" or "groups"
+    const [activeTab, setActiveTab] = useState("direct") // "direct", "groups", or "ai"
     const [selectedConversation, setSelectedConversation] = useState(null)
     const [selectedFriendName, setSelectedFriendName] = useState("")
     const [selectedGroup, setSelectedGroup] = useState(null)
@@ -92,6 +93,15 @@ export default function Chat() {
                 >
                     Groups
                 </button>
+                <button
+                    onClick={() => setActiveTab("ai")}
+                    className={`flex-1 px-6 py-3 font-medium transition-colors ${activeTab === "ai"
+                        ? `${themeStyles.text} border-b-2 border-purple-500`
+                        : `${themeStyles.accent} hover:${themeStyles.text}`
+                        }`}
+                >
+                    🤖 AI Assistant
+                </button>
             </div>
 
             <div className="flex flex-1 overflow-hidden">
@@ -111,6 +121,18 @@ export default function Chat() {
                                 {showFriendList ? "← Back to Conversations" : "+ Start New Chat"}
                             </button>
                         </>
+                    ) : activeTab === "ai" ? (
+                        <div className="p-4 text-center">
+                            <p className={`${themeStyles.accent} text-sm`}>
+                                💡 Chat with AI Assistant
+                            </p>
+                        </div>
+                    ) : activeTab === "ai" ? (
+                        <div className="p-4 text-center">
+                            <p className={`${themeStyles.accent} text-sm`}>
+                                💡 Chat with AI Assistant
+                            </p>
+                        </div>
                     ) : (
                         <>
                             <GroupChatList
@@ -140,6 +162,8 @@ export default function Chat() {
                                 onMessageSent={() => setRefreshTrigger(prev => prev + 1)}
                             />
                         )
+                    ) : activeTab === "ai" ? (
+                        <AIChatWindow />
                     ) : (
                         <GroupChatWindow
                             groupId={selectedGroup}

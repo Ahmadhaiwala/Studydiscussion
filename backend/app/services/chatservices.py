@@ -230,7 +230,7 @@ class ChatService:
         except Exception as e:
             print("ERROR:", e)
             raise HTTPException(500, f"Failed to mark messages as read: {str(e)}")
-            raise HTTPException(500, f"Failed to mark messages as read: {str(e)}")
+           
 
     @staticmethod
     async def get_conversation_details(conversation_id: str, user_id: str) -> dict:

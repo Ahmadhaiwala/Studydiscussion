@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
+    "axios": "^1.13.4",
     "bootstrap": "^5.3.8",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",

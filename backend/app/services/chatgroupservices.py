@@ -5,7 +5,10 @@ from typing import List
 from fastapi.concurrency import run_in_threadpool
 import uuid
 from datetime import datetime, timezone
-
+from app.services.assignment_detector import detect_and_store_assignment
+from app.core.ai_memory import store_embedding
+from app.services.answer_linker import detect_answer_and_link
+import asyncio
 class ChatGroupService:
     """
     Service layer for chat group-related business logic
@@ -61,7 +64,7 @@ class ChatGroupService:
             
             created_group = fetch_response.data[0]
             
-            # Add the creator as a member of the group
+            
             member_id = str(uuid.uuid4())
             member_data = {
                 "id": member_id,
@@ -489,26 +492,52 @@ class ChatGroupService:
 
             print("Database response:", response)
 
-            if not response.data or len(response.data) == 0:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to send message"
+            if not response.data:
+                raise HTTPException(status_code=500, detail="Failed to send message")
+
+            fetch_response = await run_in_threadpool(
+                lambda: supabase
+                    .table("group_messeges")
+                    .select("id, group_id, sender_id, content, created_at, updated_at")
+                    .eq("id", message_id)
+                    .execute()
+            )
+
+            message_record = fetch_response.data[0] if fetch_response.data else response.data[0]
+
+            # 🧠 Background AI (only after success)
+            import asyncio
+            asyncio.create_task(
+                detect_and_store_assignment(
+                    text=message,
+                    group_id=group_id,
+                    user_id=user_id
                 )
-            
-            # Fetch the complete message with all fields
-            message_id = response.data[0].get("id")
-            if message_id:
-                fetch_response = await run_in_threadpool(
-                    lambda: supabase
-                        .table("group_messeges")
-                        .select("id, group_id, sender_id, content, created_at, updated_at")
-                        .eq("id", message_id)
-                        .execute()
+            )
+            asyncio.create_task(
+                    detect_answer_and_link(
+                        message_text=message,
+                        message_id=message_id,
+                        group_id=group_id,
+                        student_id=user_id
+                    )
                 )
-                if fetch_response.data and len(fetch_response.data) > 0:
-                    return fetch_response.data[0]
-            
-            return response.data[0]
+
+
+            asyncio.create_task(
+                store_embedding(
+                    text=f"{sender_record.get('full_name', 'User')} said: {message}",
+                    metadata={
+                        "message_id": message_id,
+                        "group_id": group_id,
+                        "sender_id": user_id,
+                        "sender_name": sender_record.get('full_name', 'User'),
+                        "type": "message"
+                    }
+                )
+            )
+
+            return message_record
 
         except Exception as e:
             print("ERROR:", str(e))
@@ -675,6 +704,9 @@ class ChatGroupService:
     async def upload_document(group_id, current_user_id, file, message_id=None):
         """Upload a document/file to a group"""
         try:
+            
+           
+
             # Verify user is a member
             member_check = await run_in_threadpool(
                 lambda: supabase
@@ -741,6 +773,22 @@ class ChatGroupService:
                     status_code=500,
                     detail="Failed to save attachment metadata"
                 )
+            await detect_and_store_assignment(
+                                            file_content=file_content,
+                                            file_name=file.filename,
+                                            group_id=group_id,
+                                            user_id=current_user_id
+                                        )
+            asyncio.create_task(
+                store_embedding(
+                    text=f"File uploaded: {file.filename}",
+                    metadata={
+                        "attachment_id": attachment_id,
+                        "group_id": group_id,
+                        "type": "attachment"
+                    }
+                )
+            )
             
             return db_response.data[0]
 
@@ -1053,3 +1101,6 @@ class ChatGroupService:
         except Exception as e:
             print(f"Get available users error: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
+  
+            
+

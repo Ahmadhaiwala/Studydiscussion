@@ -1,211 +1,134 @@
-'use client';
-
-import { createContext, useContext, useEffect, useState } from "react"
-
-const ThemeContext = createContext(null)
-const interactions = {
-  buttonBase: `
-    relative overflow-hidden
-    transition-all duration-300 ease-out
-    hover:-translate-y-[1px]
-    active:scale-[0.97]
-    focus:outline-none focus:ring-2
-  `,
-
-  glowSweep: `
-    before:absolute before:inset-0
-    before:bg-gradient-to-r
-    before:from-transparent before:via-white/20 before:to-transparent
-    before:translate-x-[-120%]
-    hover:before:translate-x-[120%]
-    before:transition-transform before:duration-700
-  `,
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const themes = {
-  day: {
-    name: "Day",
-    bg: "bg-slate-50",
-    secondbar: "bg-slate-100",
-    cardBg: "bg-white",
-    text: "text-slate-900",
-    accent: "text-slate-600",
-    border: "border-slate-200",
 
-    button: `
-      ${interactions.buttonBase}
-      bg-slate-900 text-white
-      hover:bg-slate-800
-      shadow-sm hover:shadow-lg
-    `,
+  light: {
+    name: 'Editorial Light',
+    properties: {
+      bg: 'bg-[#e5e5e5] min-h-screen text-black',
+      secondbar: 'bg-[#d9d9d9] border-b-2 border-black',
+      cardBg: 'bg-white border-2 border-black',
+      text: 'text-black',
+      accent: 'text-purple-600',
+      border: 'border-black',
+      sectionAccent: 'border-l-4 border-black pl-4',
 
-    input: `
-      border-slate-300 bg-white text-slate-900
-      focus:ring-blue-500 focus:border-blue-500
-      transition
-    `,
+      section: 'bg-[#f5f5f5] border-2 border-black p-6',
+      heading: 'text-black font-extrabold tracking-tight',
 
-    themeButton: `
-      ${interactions.buttonBase}
-      bg-slate-200 text-slate-900
-      hover:bg-slate-300
-    `,
+      cardSoft: 'bg-white border-2 border-black p-5',
+
+      button: `
+        bg-white
+        border-2 border-black
+        px-5 py-2
+        font-bold
+        uppercase
+        tracking-wide
+        hover:bg-black hover:text-white
+        transition
+      `,
+
+      input: `
+        bg-white
+        border-2 border-black
+        px-4 py-2
+        text-black
+        focus:outline-none
+      `,
+
+      themeButton: `
+        bg-purple-400
+        border-2 border-black
+        text-black
+        px-3 py-1
+        font-bold
+      `,
+    },
   },
 
-  night: {
-    name: "Night",
-    bg: "bg-slate-950",
-    secondbar: "bg-slate-800",
-    cardBg: "bg-slate-900",
-    text: "text-slate-50",
-    accent: "text-slate-400",
-    border: "border-slate-700",
+  dark: {
+    name: 'Editorial Dark',
+    properties: {
+      bg: 'bg-black min-h-screen text-white',
+      secondbar: 'bg-neutral-900 border-b-2 border-white',
+      cardBg: 'bg-neutral-900 border-2 border-white',
+      text: 'text-white',
+      accent: 'text-pink-400',
+      border: 'border-white',
+      sectionAccent: 'border-l-4 border-white pl-4',
 
-    button: `
-      ${interactions.buttonBase}
-      ${interactions.glowSweep}
-      bg-white text-slate-900
-      hover:bg-slate-100
-      shadow hover:shadow-xl
-    `,
+      section: 'bg-neutral-900 border-2 border-white p-6',
+      heading: 'text-white font-extrabold tracking-tight',
 
-    input: `
-      border-slate-700 bg-slate-900 text-slate-50
-      focus:ring-blue-400 focus:border-blue-400
-      transition
-    `,
+      cardSoft: 'bg-neutral-900 border-2 border-white p-5',
 
-    themeButton: `
-      ${interactions.buttonBase}
-      bg-slate-800 text-slate-50
-      hover:bg-slate-700
-    `,
+      button: `
+        bg-white
+        text-black
+        border-2 border-white
+        px-5 py-2
+        font-bold
+        uppercase
+        hover:bg-pink-500 hover:text-white
+        transition
+      `,
+
+      input: `
+        bg-neutral-900
+        border-2 border-white
+        px-4 py-2
+        text-white
+        focus:outline-none
+      `,
+
+      themeButton: `
+        bg-pink-500
+        border-2 border-white
+        text-white
+        px-3 py-1
+        font-bold
+      `,
+    },
   },
-
-  elegant: {
-    name: "Elegant",
-    bg: "bg-stone-50",
-    secondbar: "bg-stone-100",
-    cardBg: "bg-white",
-    text: "text-stone-900",
-    accent: "text-stone-600",
-    border: "border-stone-300",
-
-    button: `
-      ${interactions.buttonBase}
-      bg-stone-900 text-stone-50
-      hover:bg-stone-800
-      shadow-md hover:shadow-2xl
-    `,
-
-    input: `
-      border-stone-300 bg-white text-stone-900
-      focus:ring-amber-500 focus:border-amber-500
-      transition
-    `,
-
-    themeButton: `
-      ${interactions.buttonBase}
-      bg-stone-200 text-stone-900
-      hover:bg-stone-300
-    `,
-  },
-
-  neo: {
-    name: "Neo",
-    bg: "bg-[#0b0e14]",
-    secondbar: "bg-[#121726]",
-    cardBg: "bg-[#161b2e]/80 backdrop-blur-md",
-    text: "text-slate-100",
-    accent: "text-indigo-400",
-    border: "border-white/10",
-
-    button: `
-      ${interactions.buttonBase}
-      ${interactions.glowSweep}
-      bg-indigo-500/90 text-white
-      hover:bg-indigo-400
-      shadow-[0_6px_30px_rgba(99,102,241,0.35)]
-      hover:shadow-[0_12px_50px_rgba(99,102,241,0.55)]
-    `,
-
-    input: `
-      border-white/10 bg-white/5 text-slate-100
-      placeholder:text-slate-400
-      focus:ring-indigo-500/60 focus:border-indigo-500/60
-      transition
-    `,
-
-    themeButton: `
-      ${interactions.buttonBase}
-      bg-white/5 text-slate-100
-      hover:bg-white/10
-    `,
-  },
-
-  anime: {
-    name: "Anime",
-    bg: "bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e]",
-    secondbar: "bg-black/20",
-    cardBg: "bg-white/10 backdrop-blur-lg",
-    text: "text-white",
-    accent: "text-pink-400",
-    border: "border-white/10",
-
-    button: `
-      ${interactions.buttonBase}
-      ${interactions.glowSweep}
-      bg-pink-500 text-white
-      hover:bg-pink-400
-      shadow-[0_0_30px_rgba(236,72,153,0.5)]
-    `,
-
-    input: `
-      border-white/20 bg-black/30 text-white
-      focus:ring-pink-400 focus:border-pink-400
-      transition
-    `,
-
-    themeButton: `
-      ${interactions.buttonBase}
-      bg-white/10 text-white
-      hover:bg-white/20
-    `,
-  },
-}
+};
 
 
-export function ThemeProvider({ children }) {
-    const [theme, setTheme] = useState(() => {
-        return localStorage.getItem("theme") || "day"
-    })
+const interactions = {
+  buttonBase: 'inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold transition-all duration-300 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none',
+  glowSweep: 'relative overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent before:translate-x-[-200%] hover:before:translate-x-[200%] before:transition-transform before:duration-700',
+};
 
-    useEffect(() => {
-        if (!themes[theme]) return
-        localStorage.setItem("theme", theme)
-    }, [theme])
+const ThemeContext = createContext();
 
-    return (
-        <ThemeContext.Provider
-            value={{
-                theme,
-                setTheme,
-                themeStyles: themes[theme],
-                themes,
-            }}
-        >
-            {children}
-        </ThemeContext.Provider>
-    )
-}
+export const ThemeProvider = ({ children }) => {
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem('social-theme');
+    return stored && themes[stored] ? stored : 'light';
+  });
 
-export function useTheme() {
-    const context = useContext(ThemeContext)
+  useEffect(() => {
+    localStorage.setItem('social-theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
 
-    if (!context) {
-        throw new Error("useTheme must be used inside ThemeProvider")
-    }
+  const baseProps = themes[theme]?.properties || themes.light.properties;
 
-    return context
-}
-                            
+  // Merge button interactions automatically
+  const themeStyles = {
+    ...baseProps,
+    button: `${interactions.buttonBase} ${interactions.glowSweep} ${baseProps.button}`,
+  };
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, themeStyles, themes, interactions }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) throw new Error('useTheme must be used within ThemeProvider');
+  return context;
+};

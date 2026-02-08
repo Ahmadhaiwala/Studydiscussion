@@ -201,7 +201,7 @@ async def delete_message(
     )
     return {"message": "Message deleted successfully"}
 
-# ===== DOCUMENT/ATTACHMENT MANAGEMENT =====
+
 
 @router.post("/chatgroups/{group_id}/attachments", response_model=GroupAttachmentOut)
 async def upload_attachment(
