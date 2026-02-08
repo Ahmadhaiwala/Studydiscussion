@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useTheme } from "../../context/ThemeContext"
 import { useAuth } from "../../context/AuthContext"
 import axios from "axios"
+import CodeExecutionPanel from "./CodeExecutionPanel"
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000"
 
@@ -12,6 +13,7 @@ export default function AIChatWindow({ groupId = null, groupName = null }) {
     const [inputMessage, setInputMessage] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
+    const [codeToExecute, setCodeToExecute] = useState(null)
     const messagesEndRef = useRef(null)
 
     // Auto-scroll to bottom when new messages arrive
@@ -112,6 +114,84 @@ export default function AIChatWindow({ groupId = null, groupName = null }) {
         }
     }
 
+    function detectCodeBlocks(content) {
+        // Detect code blocks with ```language or just ```
+        const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
+        const matches = []
+        let match
+
+        while ((match = codeBlockRegex.exec(content)) !== null) {
+            matches.push({
+                language: match[1] || null,
+                code: match[2].trim(),
+                fullMatch: match[0]
+            })
+        }
+
+        return matches
+    }
+
+    function formatTimestamp(timestamp) {
+        const date = new Date(timestamp)
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+
+    function renderMessageContent(content) {
+        const codeBlocks = detectCodeBlocks(content)
+
+        if (codeBlocks.length === 0) {
+            return <div className="whitespace-pre-wrap break-words">{content}</div>
+        }
+
+        // Split content by code blocks and render
+        const parts = []
+        let lastIndex = 0
+
+        codeBlocks.forEach((block, i) => {
+            const blockIndex = content.indexOf(block.fullMatch, lastIndex)
+
+            // Add text before code block
+            if (blockIndex > lastIndex) {
+                parts.push(
+                    <div key={`text-${i}`} className="whitespace-pre-wrap break-words mb-2">
+                        {content.substring(lastIndex, blockIndex)}
+                    </div>
+                )
+            }
+
+            // Add code block with run button
+            parts.push(
+                <div key={`code-${i}`} className="my-2">
+                    <div
+                        className="font-mono text-sm p-3 rounded overflow-x-auto"
+                        style={{ backgroundColor: themeStyles.background }}
+                    >
+                        <pre>{block.code}</pre>
+                    </div>
+                    <button
+                        onClick={() => setCodeToExecute({ code: block.code, language: block.language })}
+                        className="mt-2 px-3 py-1 text-sm rounded bg-green-600 hover:bg-green-700 text-white transition-colors"
+                    >
+                        ▶ Run Code{block.language ? ` (${block.language})` : ''}
+                    </button>
+                </div>
+            )
+
+            lastIndex = blockIndex + block.fullMatch.length
+        })
+
+        // Add remaining text
+        if (lastIndex < content.length) {
+            parts.push(
+                <div key="text-end" className="whitespace-pre-wrap break-words">
+                    {content.substring(lastIndex)}
+                </div>
+            )
+        }
+
+        return <>{parts}</>
+    }
+
     function formatTimestamp(timestamp) {
         const date = new Date(timestamp)
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -163,7 +243,7 @@ export default function AIChatWindow({ groupId = null, groupName = null }) {
                                         : `${themeStyles.secondbar} ${themeStyles.text}`
                                     }`}
                             >
-                                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                                {renderMessageContent(msg.content)}
                                 <div
                                     className={`text-xs mt-1 ${msg.sender === "user" ? "text-blue-100" : themeStyles.accent
                                         }`}
@@ -209,6 +289,15 @@ export default function AIChatWindow({ groupId = null, groupName = null }) {
                     </button>
                 </form>
             </div>
+
+            {/* Code Execution Panel */}
+            {codeToExecute && (
+                <CodeExecutionPanel
+                    code={codeToExecute.code}
+                    language={codeToExecute.language}
+                    onClose={() => setCodeToExecute(null)}
+                />
+            )}
         </div>
     )
 }

@@ -3,6 +3,7 @@ import os
 from typing import List, Dict
 from datetime import datetime
 from app.core.supabase import supabase
+from app.services.intent_detection_service import intent_detection_service
 
 OPENROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY")
 
@@ -118,10 +119,37 @@ class AIChatService:
             await self._store_message(user_id, message, ai_response, group_id)
             print(f"✅ Message stored successfully")
 
+            # Detect admin intents (reminders, etc.) if in group chat
+            suggested_action = None
+            if group_id:
+                try:
+                    is_admin = await self._check_if_admin(user_id, group_id)
+                    if is_admin:
+                        print(f"🤖 Checking for reminder intent...")
+                        intent = await intent_detection_service.detect_reminder_intent(message)
+                        
+                        if intent.detected and intent.confidence > 0.7:
+                            print(f"✅ Reminder intent detected! Confidence: {intent.confidence}")
+                            suggested_action = {
+                                "type": "create_reminder",
+                                "data": {
+                                    "title": intent.title,
+                                    "description": intent.description,
+                                    "due_date": intent.due_date,
+                                    "priority": intent.priority,
+                                    "confidence": intent.confidence
+                                }
+                            }
+                        else:
+                            print(f"ℹ️ No strong reminder intent (confidence: {intent.confidence})")
+                except Exception as e:
+                    print(f"⚠️ Intent detection error: {str(e)}")
+
             return {
                 "response": ai_response,
                 "timestamp": datetime.now().isoformat(),
-                "error": False
+                "error": False,
+                "suggested_action": suggested_action
             }
 
         except Exception as e:
@@ -233,14 +261,21 @@ class AIChatService:
             for att in response.data:
                 uploader = att.get("profiles", {}).get("full_name", "Unknown") if att.get("profiles") else "Unknown"
                 
-                # Extract PDF text if it's a PDF
+                # Extract content from documents (PDFs and text files)
                 extracted_text = None
                 file_type = att.get("file_type", "").lower()
                 file_name = att.get("file_name", "").lower()
+                file_path = att.get("file_path")
                 
+                # Extract from PDF files
                 if "pdf" in file_type or file_name.endswith('.pdf'):
-                    extracted_text = await self._extract_pdf_text(att.get("file_path"), att.get("file_name"))
+                    extracted_text = await self._extract_pdf_text(file_path, att.get("file_name"))
                 
+                # Extract from text-based files
+                elif any(file_name.endswith(ext) for ext in ['.txt', '.md', '.py', '.js', '.json', '.csv', '.xml', '.html', '.css', '.java', '.cpp', '.c', '.sh']):
+                    extracted_text = await self._extract_text_file(file_path, att.get("file_name"))
+                
+                # Store in attachments list
                 attachments.append({
                     "filename": att["file_name"],
                     "type": att.get("file_type", "unknown"),
@@ -321,6 +356,68 @@ class AIChatService:
             traceback.print_exc()
             return None
     
+    async def _extract_text_file(self, file_path: str, file_name: str) -> str:
+        """Extract text content from text-based files (.txt, .md, .py, etc.)"""
+        try:
+            import requests as req
+            import os
+            
+            if not file_path:
+                print(f"⚠️ No file_path provided for {file_name}")
+                return None
+            
+            print(f"📄 Attempting to extract text from file: {file_name}")
+            print(f"   File path: {file_path}")
+            
+            # Convert Supabase storage path to public URL if needed
+            if not file_path.startswith("http"):
+                supabase_url = os.getenv("SUPABASE_URL", "")
+                if supabase_url:
+                    file_path = f"{supabase_url}/storage/v1/object/public/message/{file_path}"
+                    print(f"   Converted to public URL: {file_path}")
+            
+            # Download file
+            print(f"   Downloading file from URL...")
+            file_response = req.get(file_path, timeout=15)
+            
+            if file_response.status_code != 200:
+                print(f"❌ Failed to download file: HTTP {file_response.status_code}")
+                print(f"   Response: {file_response.text[:200]}")
+                return None
+            
+            print(f"   ✅ Downloaded {len(file_response.content)} bytes")
+            
+            # Try different encodings for text extraction
+            text_content = None
+            encodings = ['utf-8', 'utf-16', 'latin-1', 'cp1252']
+            
+            for encoding in encodings:
+                try:
+                    text_content = file_response.content.decode(encoding)
+                    print(f"   ✅ Successfully decoded with {encoding}")
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if not text_content:
+                print(f"❌ Failed to decode file with any encoding")
+                return None
+            
+            # Limit to first 3000 characters (more than PDF since it's already text)
+            text_content = text_content.strip()[:3000]
+            print(f"✅ Successfully extracted {len(text_content)} characters from {file_name}")
+            
+            if text_content:
+                print(f"   Preview: {text_content[:100]}...")
+            
+            return text_content if text_content else None
+            
+        except Exception as e:
+            print(f"❌ Error extracting text from {file_name}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
     async def _store_message(self, user_id: str, user_message: str, ai_response: str, group_id: str = None):
         """Store chat history in database"""
         try:
@@ -344,6 +441,23 @@ class AIChatService:
             import traceback
             traceback.print_exc()
             pass
+    
+    async def _check_if_admin(self, user_id: str, group_id: str) -> bool:
+        """Check if user is an admin of the specified group"""
+        try:
+            response = supabase.table("group_members") \
+                .select("role") \
+                .eq("group_id", group_id) \
+                .eq("user_id", user_id) \
+                .execute()
+            
+            if response.data and len(response.data) > 0:
+                return response.data[0].get("role") == "admin"
+            return False
+        except Exception as e:
+            print(f"Error checking admin status: {str(e)}")
+            return False
+    
     async def search_similar(query: str, limit: int = 5) -> List[Dict]:
         try:
             query_vector = model.encode(query).tolist()

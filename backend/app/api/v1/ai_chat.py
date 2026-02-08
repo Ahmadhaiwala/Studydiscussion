@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.core.security import get_current_user
 from app.services.ai_chat_service import ai_chat_service
+from app.services.code_executor import code_executor
 from typing import Optional
 
 router = APIRouter()
@@ -17,6 +18,17 @@ class ChatResponse(BaseModel):
     response: str
     timestamp: str
     error: bool
+
+class CodeExecuteRequest(BaseModel):
+    code: str
+    language: Optional[str] = None
+
+class CodeExecuteResponse(BaseModel):
+    success: bool
+    output: str
+    error: str
+    language: Optional[str]
+    execution_time: float
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(
@@ -69,4 +81,36 @@ async def get_chat_history(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch chat history: {str(e)}"
+        )
+
+@router.post("/execute-code", response_model=CodeExecuteResponse)
+async def execute_code(
+    request: CodeExecuteRequest,
+    current_user = Depends(get_current_user)
+):
+    """
+    Execute code snippet and return output
+    
+    Supports Python and JavaScript (Node.js required)
+    """
+    try:
+        print(f"🔧 Executing code for user {current_user.id}")
+        print(f"   Language: {request.language or 'auto-detect'}")
+        print(f"   Code length: {len(request.code)} characters")
+        
+        result = code_executor.execute_code(
+            code=request.code,
+            language=request.language
+        )
+        
+        print(f"   Result: {'✅ Success' if result['success'] else '❌ Error'}")
+        print(f"   Execution time: {result['execution_time']}s")
+        
+        return CodeExecuteResponse(**result)
+        
+    except Exception as e:
+        print(f"Code execution error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to execute code: {str(e)}"
         )

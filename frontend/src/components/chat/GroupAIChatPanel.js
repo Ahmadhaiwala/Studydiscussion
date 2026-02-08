@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useTheme } from "../../context/ThemeContext"
 import { useAuth } from "../../context/AuthContext"
 import axios from "axios"
+import ReminderSuggestionModal from "../modals/ReminderSuggestionModal"
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000"
 
@@ -12,6 +13,8 @@ export default function GroupAIChatPanel({ groupId, groupName, isExpanded, onTog
     const [inputMessage, setInputMessage] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
+    const [reminderSuggestion, setReminderSuggestion] = useState(null)
+    const [showReminderModal, setShowReminderModal] = useState(false)
     const messagesEndRef = useRef(null)
 
     // Auto-scroll to bottom when new messages arrive
@@ -95,6 +98,13 @@ export default function GroupAIChatPanel({ groupId, groupName, isExpanded, onTog
                 timestamp: response.data.timestamp
             }
             setMessages(prev => [...prev, aiMsg])
+
+            // Check for AI suggested actions (reminder intent detection)
+            if (response.data.suggested_action?.type === 'create_reminder') {
+                console.log('🤖 AI detected reminder intent!', response.data.suggested_action)
+                setReminderSuggestion(response.data.suggested_action.data)
+                setShowReminderModal(true)
+            }
 
         } catch (err) {
             console.error("AI Chat Error:", err)
@@ -182,10 +192,10 @@ export default function GroupAIChatPanel({ groupId, groupName, isExpanded, onTog
                                 >
                                     <div
                                         className={`max-w-[85%] rounded-lg p-2 text-sm ${msg.sender === "user"
-                                                ? "bg-blue-600 text-white"
-                                                : msg.isError
-                                                    ? "bg-red-500 text-white"
-                                                    : `${themeStyles.cardBg} ${themeStyles.text} border ${themeStyles.border}`
+                                            ? "bg-blue-600 text-white"
+                                            : msg.isError
+                                                ? "bg-red-500 text-white"
+                                                : `${themeStyles.cardBg} ${themeStyles.text} border ${themeStyles.border}`
                                             }`}
                                     >
                                         <div className="whitespace-pre-wrap break-words">{msg.content}</div>
@@ -226,8 +236,8 @@ export default function GroupAIChatPanel({ groupId, groupName, isExpanded, onTog
                                 type="submit"
                                 disabled={isLoading || !inputMessage.trim()}
                                 className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${isLoading || !inputMessage.trim()
-                                        ? "bg-gray-400 cursor-not-allowed"
-                                        : "bg-blue-600 hover:bg-blue-700"
+                                    ? "bg-gray-400 cursor-not-allowed"
+                                    : "bg-blue-600 hover:bg-blue-700"
                                     } text-white`}
                             >
                                 {isLoading ? "..." : "Send"}
@@ -235,6 +245,31 @@ export default function GroupAIChatPanel({ groupId, groupName, isExpanded, onTog
                         </form>
                     </div>
                 </>
+            )}
+
+            {/* Reminder Suggestion Modal */}
+            {showReminderModal && (
+                <ReminderSuggestionModal
+                    suggestion={reminderSuggestion}
+                    groupId={groupId}
+                    onConfirm={(reminderData) => {
+                        console.log('✅ Reminder created:', reminderData)
+                        setShowReminderModal(false)
+                        setReminderSuggestion(null)
+                        // Show success message in chat
+                        const successMsg = {
+                            sender: "ai",
+                            content: `✅ Reminder "${reminderData.title}" created successfully!`,
+                            timestamp: new Date().toISOString()
+                        }
+                        setMessages(prev => [...prev, successMsg])
+                    }}
+                    onCancel={() => {
+                        console.log('❌ Reminder creation cancelled')
+                        setShowReminderModal(false)
+                        setReminderSuggestion(null)
+                    }}
+                />
             )}
         </div>
     )
